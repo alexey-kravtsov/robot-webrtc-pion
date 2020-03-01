@@ -1,20 +1,16 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"math/rand"
 
 	"github.com/pion/webrtc/v2"
 
-	gst "github.com/pion/example-webrtc-applications/internal/gstreamer-src"
-	"github.com/pion/example-webrtc-applications/internal/signal"
+	gst "github.com/alexey-kravtsov/robot-webrtc-pion/internal/gstreamer-src"
+	"github.com/alexey-kravtsov/robot-webrtc-pion/internal/signal"
 )
 
 func main() {
-	videoSrc := flag.String("video-src", "videotestsrc", "GStreamer video src")
-	flag.Parse()
-
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
@@ -31,12 +27,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	// Set the handler for ICE connection state
-	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-		fmt.Printf("Connection State has changed %s \n", connectionState.String())
-	})
 
 	peerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		if candidate != nil {
@@ -80,7 +70,7 @@ func main() {
 	fmt.Println(signal.Encode(answer))
 
 	// Start pushing buffers on these tracks
-	gst.CreatePipeline(webrtc.H264, []*webrtc.Track{firstVideoTrack}, *videoSrc).Start()
+	gst.CreatePipeline([]*webrtc.Track{firstVideoTrack}).Start()
 
 	// Block forever
 	select {}
