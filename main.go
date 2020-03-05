@@ -16,7 +16,7 @@ func main() {
 	}
 	defer c.Close()
 
-	c.WriteMessage(websocket.TextMessage, []byte("Hello"))
+	c.WriteMessage(websocket.TextMessage, []byte("Hello from robot"))
 
 	// Block forever
 	select {}
