@@ -16,8 +16,21 @@ func main() {
 	}
 	defer c.Close()
 
-	c.WriteMessage(websocket.TextMessage, []byte("Hello from robot"))
+	go handleSignalingMessages(c)
 
 	// Block forever
 	select {}
+}
+
+func handleSignalingMessages(c *websocket.Conn) {
+	for {
+		var message sdpMessage
+		c.ReadJSON(&message)
+		log.Println(message)
+	}
+}
+
+type sdpMessage struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
 }
