@@ -1,36 +1,16 @@
 package main
 
 import (
-	//"github.com/alexey-kravtsov/robot-webrtc-pion/internal/webrtcservice"
-	"log"
-
-	"github.com/gorilla/websocket"
+	"github.com/alexey-kravtsov/robot-webrtc-pion/internal/service"
 )
 
 func main() {
-	//webrtcservice.Start()
-	c, _, err := websocket.DefaultDialer.Dial("ws://localhost:8080/signaling/robot", nil)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	defer c.Close()
+	signaling := make(chan service.Message, 10)
+	webrtc := make(chan service.Message, 10)
 
-	go handleSignalingMessages(c)
+	go service.StartSignaling(signaling, webrtc)
+	go service.StartWebrtc(webrtc, signaling)
 
 	// Block forever
 	select {}
-}
-
-func handleSignalingMessages(c *websocket.Conn) {
-	for {
-		var message sdpMessage
-		c.ReadJSON(&message)
-		log.Println(message)
-	}
-}
-
-type sdpMessage struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
 }
