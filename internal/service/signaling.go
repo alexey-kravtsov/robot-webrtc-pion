@@ -6,18 +6,20 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var websocketConn *websocket.Conn
+
 func StartSignaling(sigchan <-chan Message, wchan chan<- Message) {
-	c, _, err := websocket.DefaultDialer.Dial("ws://192.168.0.147:8080/signaling/robot", nil)
+	websocketConn, _, err := websocket.DefaultDialer.Dial("ws://35.228.84.151:8080/signaling/robot", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer websocketConn.Close()
 
-	go sendIncoming(sigchan, c)
+	go sendIncoming(sigchan, websocketConn)
 
 	for {
 		var m Message
-		err := c.ReadJSON(&m)
+		err := websocketConn.ReadJSON(&m)
 		if err != nil {
 			log.Printf("Unable to deserialize message %s \n", err)
 			continue

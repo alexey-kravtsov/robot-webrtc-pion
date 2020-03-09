@@ -45,7 +45,7 @@ func CreatePipeline(tracks []*webrtc.Track) *Pipeline {
 	! videoconvert 
 	! queue 
 	! video/x-raw,format=I420 
-	! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=60 threads=4 sliced-threads=true 
+	! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 threads=4 sliced-threads=true 
 	! video/x-h264,stream-format=byte-stream 
 	! appsink name=appsink`
 

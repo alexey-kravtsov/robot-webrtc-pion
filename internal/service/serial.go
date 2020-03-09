@@ -2,11 +2,14 @@ package service
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/jacobsa/go-serial/serial"
 
 	"log"
 )
+
+var port io.ReadWriteCloser
 
 func StartSerial(serialchan <-chan string) {
 	options := serial.OpenOptions{
@@ -35,12 +38,12 @@ func StartSerial(serialchan <-chan string) {
 		m := <-serialchan
 		bytes, err := convertPayload(m)
 		if err != nil {
-			log.Printf("Unable to convert payload: %s \n", m)
+			log.Printf("Unable to convert payload %s: %s \n", m, err)
 			continue
 		}
 
 		if _, err = port.Write(bytes); err != nil {
-			log.Printf("Unable to write payload: %s \n", m)
+			log.Printf("Unable to write payload %s: %s \n", m, err)
 		}
 	}
 }
@@ -84,7 +87,7 @@ func convertPayload(data string) ([]byte, error) {
 			speed = 3
 		default:
 			{
-				return nil, fmt.Errorf("Incorrect speed: %s", data[4])
+				return nil, fmt.Errorf("Incorrect speed: %d", data[4])
 			}
 		}
 
@@ -92,5 +95,5 @@ func convertPayload(data string) ([]byte, error) {
 		return bytes[:], nil
 	}
 
-	return nil, fmt.Errorf("Incorrect data length: %s", length)
+	return nil, fmt.Errorf("Incorrect data length: %d", length)
 }
