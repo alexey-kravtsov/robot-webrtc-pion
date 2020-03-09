@@ -10,6 +10,9 @@ import (
 	gst "github.com/alexey-kravtsov/robot-webrtc-pion/internal/gstreamer-src"
 )
 
+var pc *pion.PeerConnection
+var dc *pion.DataChannel
+
 func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- Message) {
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
@@ -35,8 +38,8 @@ func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- 
 	})
 
 	pc.OnDataChannel(func(d *pion.DataChannel) {
-
-		d.OnMessage(func(m pion.DataChannelMessage) {
+		dc = d
+		dc.OnMessage(func(m pion.DataChannelMessage) {
 			serialchan <- string(m.Data)
 		})
 	})
