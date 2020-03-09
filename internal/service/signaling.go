@@ -6,15 +6,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func StartSignaling(schan <-chan Message, wchan chan<- Message) {
+func StartSignaling(sigchan <-chan Message, wchan chan<- Message) {
 	c, _, err := websocket.DefaultDialer.Dial("ws://192.168.0.147:8080/signaling/robot", nil)
 	if err != nil {
 		log.Fatal(err)
-		return
 	}
 	defer c.Close()
 
-	go sendIncoming(schan, c)
+	go sendIncoming(sigchan, c)
 
 	for {
 		var m Message

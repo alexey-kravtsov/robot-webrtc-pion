@@ -10,7 +10,7 @@ import (
 	gst "github.com/alexey-kravtsov/robot-webrtc-pion/internal/gstreamer-src"
 )
 
-func StartWebrtc(wchan <-chan Message, schan chan<- Message) {
+func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- Message) {
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
@@ -31,19 +31,20 @@ func StartWebrtc(wchan <-chan Message, schan chan<- Message) {
 	defer pc.Close()
 
 	pc.OnICECandidate(func(candidate *pion.ICECandidate) {
-		sendIceCandidate(schan, candidate)
+		sendIceCandidate(sigchan, candidate)
 	})
 
 	pc.OnDataChannel(func(d *pion.DataChannel) {
+
 		d.OnMessage(func(m pion.DataChannelMessage) {
-			log.Printf("Datachannel message: %s \n", string(m.Data))
+			serialchan <- string(m.Data)
 		})
 	})
 
-	handleSignalingMessages(wchan, schan, pc)
+	handleSignalingMessages(wchan, sigchan, pc)
 }
 
-func sendIceCandidate(schan chan<- Message, candidate *pion.ICECandidate) {
+func sendIceCandidate(sigchan chan<- Message, candidate *pion.ICECandidate) {
 	if candidate == nil {
 		return
 	}
@@ -54,10 +55,10 @@ func sendIceCandidate(schan chan<- Message, candidate *pion.ICECandidate) {
 		return
 	}
 
-	schan <- Message{"ice", string(data)}
+	sigchan <- Message{"ice", string(data)}
 }
 
-func handleSignalingMessages(wchan <-chan Message, schan chan<- Message, pc *pion.PeerConnection) {
+func handleSignalingMessages(wchan <-chan Message, sigchan chan<- Message, pc *pion.PeerConnection) {
 	for {
 		message := <-wchan
 		switch message.Type {
@@ -111,7 +112,7 @@ func handleSignalingMessages(wchan <-chan Message, schan chan<- Message, pc *pio
 					continue
 				}
 
-				schan <- Message{"sdp", string(jsonAnswer)}
+				sigchan <- Message{"sdp", string(jsonAnswer)}
 
 				// Start pushing buffers on these tracks
 				gst.CreatePipeline([]*pion.Track{firstVideoTrack}).Start()
