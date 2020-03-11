@@ -68,18 +68,23 @@ func handleSignalingMessages(wchan <-chan Message, sigchan chan<- Message, pc *p
 		case "sdp":
 			{
 				// Create a video track
-				firstVideoTrack, err := pc.NewTrack(pion.DefaultPayloadTypeH264, rand.Uint32(), "video", "pion2")
+				trackID := rand.Uint32()
+				firstVideoTrack, err := pc.NewTrack(pion.DefaultPayloadTypeH264, trackID, "video", "pion2")
 				if err != nil {
 					log.Printf("Unable to create video track %s \n", err)
 					continue
 				}
-				_, err = pc.AddTrack(firstVideoTrack)
-				if err != nil {
-					log.Printf("Unable add track %s \n", err)
-					continue
-				}
 
-				// Wait for the offer to be pasted
+				transOptions := pion.RtpTransceiverInit{
+					Direction: pion.RTPTransceiverDirectionSendonly,
+					SendEncodings: []pion.RTPEncodingParameters{
+						pion.RTPEncodingParameters{
+							RTPCodingParameters: pion.RTPCodingParameters{SSRC: trackID, PayloadType: pion.DefaultPayloadTypeH264},
+						},
+					},
+				}
+				pc.AddTransceiverFromTrack(firstVideoTrack, transOptions)
+
 				offer := pion.SessionDescription{}
 				err = json.Unmarshal([]byte(message.Data), &offer)
 				if err != nil {
