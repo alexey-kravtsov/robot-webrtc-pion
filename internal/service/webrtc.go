@@ -14,65 +14,16 @@ import (
 
 var pc *pion.PeerConnection
 var dc *pion.DataChannel
+var iceCandidates []pion.ICECandidateInit
 
 func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- Message) {
-	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
-
-	// Prepare the configuration
-	config := pion.Configuration{
-		ICEServers: []pion.ICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
-		},
-	}
-
-	// Create a new RTCPeerConnection
-	pc, err := pion.NewPeerConnection(config)
-	if err != nil {
-		panic(err)
-	}
-
-	defer pc.Close()
-
-	pc.OnICECandidate(func(candidate *pion.ICECandidate) {
-		sendIceCandidate(sigchan, candidate)
-	})
-
-	pc.OnDataChannel(func(d *pion.DataChannel) {
-		dc = d
-		dc.OnMessage(func(m pion.DataChannelMessage) {
-			serialchan <- string(m.Data)
-			//log.Printf("Datachannel message: %s\n", string(m.Data))
-		})
-	})
-
-	handleSignalingMessages(wchan, sigchan, pc)
-}
-
-func sendIceCandidate(sigchan chan<- Message, candidate *pion.ICECandidate) {
-	if candidate == nil {
-		return
-	}
-
-	data, err := json.Marshal(candidate.ToJSON())
-	if err != nil {
-		log.Printf("Unable to serialize ICE candidate %s \n", err)
-		return
-	}
-
-	sigchan <- Message{"ice", string(data)}
-}
-
-func handleSignalingMessages(wchan <-chan Message, sigchan chan<- Message, pc *pion.PeerConnection) {
 	for {
 		message := <-wchan
 		switch message.Type {
 		case "sdp":
 			{
 				offer := pion.SessionDescription{}
-				err := json.Unmarshal([]byte(message.Data), &offer)
-				if err != nil {
+				if err := json.Unmarshal([]byte(message.Data), &offer); err != nil {
 					log.Printf("Unable to deserialize offer %s \n", err)
 					continue
 				}
@@ -92,7 +43,38 @@ func handleSignalingMessages(wchan <-chan Message, sigchan chan<- Message, pc *p
 					continue
 				}
 
-				pc.RegisterCodec(pion.NewRTPH264Codec(codecID, 90000))
+				mediaEngine := pion.MediaEngine{}
+				if err := mediaEngine.PopulateFromSDP(offer); err != nil {
+					log.Printf("Unable to populate codecs from offer %s \n", err)
+					continue
+				}
+
+				// Create a new RTCPeerConnection
+				api := pion.NewAPI(pion.WithMediaEngine(mediaEngine))
+				pc, err := api.NewPeerConnection(pion.Configuration{
+					ICEServers: []pion.ICEServer{
+						{
+							URLs: []string{"stun:stun.l.google.com:19302"},
+						},
+					},
+				})
+				if err != nil {
+					panic(err)
+				}
+
+				defer pc.Close()
+
+				pc.OnICECandidate(func(candidate *pion.ICECandidate) {
+					sendIceCandidate(sigchan, candidate)
+				})
+
+				pc.OnDataChannel(func(d *pion.DataChannel) {
+					dc = d
+					dc.OnMessage(func(m pion.DataChannelMessage) {
+						serialchan <- string(m.Data)
+						//log.Printf("Datachannel message: %s\n", string(m.Data))
+					})
+				})
 
 				// Create a video track
 				trackID := rand.Uint32()
@@ -158,8 +140,34 @@ func handleSignalingMessages(wchan <-chan Message, sigchan chan<- Message, pc *p
 					continue
 				}
 
+				if pc == nil {
+					iceCandidates = append(iceCandidates, ice)
+					continue
+				}
+
+				if len(iceCandidates) != 0 {
+					for _, queuedIce := range iceCandidates {
+						pc.AddICECandidate(queuedIce)
+					}
+					iceCandidates = iceCandidates[:0]
+				}
+
 				pc.AddICECandidate(ice)
 			}
 		}
 	}
+}
+
+func sendIceCandidate(sigchan chan<- Message, candidate *pion.ICECandidate) {
+	if candidate == nil {
+		return
+	}
+
+	data, err := json.Marshal(candidate.ToJSON())
+	if err != nil {
+		log.Printf("Unable to serialize ICE candidate %s \n", err)
+		return
+	}
+
+	sigchan <- Message{"ice", string(data)}
 }
