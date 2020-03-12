@@ -8,6 +8,8 @@ import (
 	pion "github.com/pion/webrtc/v2"
 
 	gst "github.com/alexey-kravtsov/robot-webrtc-pion/internal/gstreamer-src"
+
+	"github.com/pion/sdp/v2"
 )
 
 var pc *pion.PeerConnection
@@ -41,6 +43,7 @@ func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- 
 		dc = d
 		dc.OnMessage(func(m pion.DataChannelMessage) {
 			serialchan <- string(m.Data)
+			//log.Printf("Datachannel message: %s\n", string(m.Data))
 		})
 	})
 
@@ -67,25 +70,51 @@ func handleSignalingMessages(wchan <-chan Message, sigchan chan<- Message, pc *p
 		switch message.Type {
 		case "sdp":
 			{
-				// Create a video track
-				firstVideoTrack, err := pc.NewTrack(pion.DefaultPayloadTypeH264, rand.Uint32(), "video", "pion2")
-				if err != nil {
-					log.Printf("Unable to create video track %s \n", err)
-					continue
-				}
-				_, err = pc.AddTrack(firstVideoTrack)
-				if err != nil {
-					log.Printf("Unable add track %s \n", err)
-					continue
-				}
-
-				// Wait for the offer to be pasted
 				offer := pion.SessionDescription{}
-				err = json.Unmarshal([]byte(message.Data), &offer)
+				err := json.Unmarshal([]byte(message.Data), &offer)
 				if err != nil {
 					log.Printf("Unable to deserialize offer %s \n", err)
 					continue
 				}
+
+				sessionDescr := sdp.SessionDescription{}
+				if err := sessionDescr.Unmarshal([]byte(offer.SDP)); err != nil {
+					log.Printf("Unable to parse offer SDP %s \n", err)
+					continue
+				}
+
+				codecID, err := sessionDescr.GetPayloadTypeForCodec(sdp.Codec{
+					Name:      "H264",
+					ClockRate: 90000,
+				})
+				if err != nil {
+					log.Printf("Client does not support codec %s \n", err)
+					continue
+				}
+
+				pc.RegisterCodec(pion.NewRTPH264Codec(codecID, 90000))
+
+				// Create a video track
+				trackID := rand.Uint32()
+				videoTrack, err := pc.NewTrack(codecID, trackID, "video", "pion2")
+				if err != nil {
+					log.Printf("Unable to create video track %s \n", err)
+					continue
+				}
+
+				transOptions := pion.RtpTransceiverInit{
+					Direction: pion.RTPTransceiverDirectionSendonly,
+					SendEncodings: []pion.RTPEncodingParameters{
+						pion.RTPEncodingParameters{
+							RTPCodingParameters: pion.RTPCodingParameters{SSRC: trackID, PayloadType: codecID},
+						},
+					},
+				}
+				pc.AddTransceiverFromTrack(videoTrack, transOptions)
+
+				pc.AddTransceiver(pion.RTPCodecTypeAudio, pion.RtpTransceiverInit{
+					Direction: pion.RTPTransceiverDirectionInactive,
+				})
 
 				// Set the remote SessionDescription
 				err = pc.SetRemoteDescription(offer)
@@ -118,7 +147,7 @@ func handleSignalingMessages(wchan <-chan Message, sigchan chan<- Message, pc *p
 				sigchan <- Message{"sdp", string(jsonAnswer)}
 
 				// Start pushing buffers on these tracks
-				gst.CreatePipeline([]*pion.Track{firstVideoTrack}).Start()
+				gst.CreatePipeline([]*pion.Track{videoTrack}).Start()
 			}
 		case "ice":
 			{
