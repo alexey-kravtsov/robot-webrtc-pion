@@ -55,6 +55,19 @@ func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- 
 					ICEServers: []pion.ICEServer{
 						{
 							URLs: []string{"stun:stun.l.google.com:19302"},
+						}, {
+							URLs: []string{"stun:stun.ekiga.net"},
+						}, {
+							URLs: []string{"stun:stun.ideasip.com"},
+						}, {
+							URLs: []string{"stun:stun.stunprotocol.org:3478"},
+						}, {
+							URLs: []string{"stun:stun.voiparound.com"},
+						}, {
+							URLs:           []string{"turn:numb.viagenie.ca"},
+							Username:       "webrtc@live.com",
+							Credential:     "muazkh",
+							CredentialType: pion.ICECredentialTypePassword,
 						},
 					},
 				})
