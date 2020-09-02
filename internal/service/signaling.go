@@ -9,7 +9,8 @@ import (
 var websocketConn *websocket.Conn
 
 func StartSignaling(sigchan <-chan Message, wchan chan<- Message) {
-	websocketConn, _, err := websocket.DefaultDialer.Dial("ws://35.228.37.214:8080/signaling/robot", nil)
+	websocketConn, _, err := websocket.DefaultDialer.Dial("wss://robot-signaling-server.herokuapp.com/signaling/robot", nil)
+	//websocketConn, _, err := websocket.DefaultDialer.Dial("ws://localhost:8080/signaling/robot", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
