@@ -2,6 +2,7 @@ package service
 
 import (
 	"log"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -14,8 +15,15 @@ func StartSignaling(sigchan <-chan Message, wchan chan<- Message) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer websocketConn.Close()
 
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Error in websocket connection %s \n", r)
+		}
+		websocketConn.Close()
+	}()
+
+	go ping(websocketConn)
 	go sendIncoming(sigchan, websocketConn)
 
 	for {
@@ -32,6 +40,13 @@ func StartSignaling(sigchan <-chan Message, wchan chan<- Message) {
 		default:
 			log.Printf("Unknown message type: %s \n", m.Type)
 		}
+	}
+}
+
+func ping(c *websocket.Conn) {
+	for {
+		c.WriteMessage(websocket.TextMessage, []byte("PING"))
+		time.Sleep(10 * time.Second)
 	}
 }
 

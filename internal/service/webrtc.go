@@ -15,6 +15,7 @@ import (
 var pc *pion.PeerConnection
 var dc *pion.DataChannel
 var iceCandidates []pion.ICECandidateInit
+var pipeline *gst.Pipeline
 
 func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- Message) {
 	for {
@@ -22,6 +23,19 @@ func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- 
 		switch message.Type {
 		case "sdp":
 			{
+				if pipeline != nil {
+					pipeline.Stop()
+					pipeline = nil
+				}
+				if pc != nil {
+					pc.Close()
+					pc = nil
+				}
+				if dc != nil {
+					dc.Close()
+					pc = nil
+				}
+
 				offer := pion.SessionDescription{}
 				if err := json.Unmarshal([]byte(message.Data), &offer); err != nil {
 					log.Printf("Unable to deserialize offer %s \n", err)
@@ -87,7 +101,7 @@ func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- 
 				transOptions := pion.RtpTransceiverInit{
 					Direction: pion.RTPTransceiverDirectionSendonly,
 					SendEncodings: []pion.RTPEncodingParameters{
-						pion.RTPEncodingParameters{
+						{
 							RTPCodingParameters: pion.RTPCodingParameters{SSRC: trackID, PayloadType: codecID},
 						},
 					},
@@ -129,7 +143,18 @@ func StartWebrtc(wchan <-chan Message, serialchan chan<- string, sigchan chan<- 
 				sigchan <- Message{"sdp", string(jsonAnswer)}
 
 				// Start pushing buffers on these tracks
-				gst.CreatePipeline([]*pion.Track{videoTrack}).Start()
+				pipeline = gst.CreatePipeline([]*pion.Track{videoTrack})
+				pipeline.Start()
+				var pipelineLocal = pipeline
+
+				pc.OnConnectionStateChange(func(state pion.PeerConnectionState) {
+					log.Printf("Peerconnection state: %s \n", state)
+					if state == pion.PeerConnectionStateDisconnected ||
+						state == pion.PeerConnectionStateFailed ||
+						state == pion.PeerConnectionStateClosed {
+						pipelineLocal.Stop()
+					}
+				})
 			}
 		case "ice":
 			{
