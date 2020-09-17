@@ -23,7 +23,8 @@ func StartSerial(serialchan <-chan string) {
 	// Open the port.
 	port, err := serial.Open(options)
 	if err != nil {
-		log.Fatalf("Unable to open serial port: %s", err)
+		log.Printf("Unable to open serial port: %s", err)
+		return
 	}
 
 	// Make sure to close it later.
