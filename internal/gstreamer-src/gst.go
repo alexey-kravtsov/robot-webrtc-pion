@@ -40,14 +40,7 @@ const (
 
 // CreatePipeline creates a GStreamer Pipeline
 func CreatePipeline(tracks []*webrtc.Track) *Pipeline {
-	pipelineStr := `autovideosrc 
-	! video/x-raw, width=640, height=480 
-	! videoconvert 
-	! queue 
-	! video/x-raw,format=I420 
-	! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 threads=4 sliced-threads=true 
-	! video/x-h264,stream-format=byte-stream 
-	! appsink name=appsink`
+	pipelineStr := getPipeline()
 
 	pipelineStrUnsafe := C.CString(pipelineStr)
 	defer C.free(unsafe.Pointer(pipelineStrUnsafe))
